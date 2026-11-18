@@ -102,6 +102,12 @@ export class IntexStack extends Stack {
     deployRole.addToPolicy(new iam.PolicyStatement({ actions: ['elasticbeanstalk:DescribeEnvironments', 'elasticbeanstalk:DescribeEvents', 'elasticbeanstalk:DescribeApplicationVersions'], resources: ['*'], conditions: regionCondition }));
     deployRole.addToPolicy(new iam.PolicyStatement({ actions: ['s3:PutObject', 's3:GetObject'], resources: [artifacts.arnForObjects('releases/*')] }));
     deployRole.addToPolicy(new iam.PolicyStatement({ actions: ['s3:ListBucket', 's3:GetBucketLocation'], resources: [artifacts.bucketArn] }));
+    // UpdateEnvironment checks/ensures its regional EB service bucket even when it exists.
+    deployRole.addToPolicy(new iam.PolicyStatement({
+      actions: ['s3:CreateBucket'],
+      resources: [`arn:${this.partition}:s3:::elasticbeanstalk-${this.region}-${this.account}`],
+      conditions: regionCondition,
+    }));
     const topic = new sns.Topic(this, 'Alerts');
     topic.addSubscription(new subscriptions.EmailSubscription(email.valueAsString));
     const alarm = new cw.Alarm(this, 'HealthAlarm', {

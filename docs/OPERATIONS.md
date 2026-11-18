@@ -125,7 +125,9 @@ For this repository the allowed subject is:
 Forks, PR refs, feature branches and other repositories cannot assume this role.
 The role can write only `releases/*` in its artifact bucket, create INTEX application
 versions and update `intex-dev`; it cannot provision infrastructure, pass IAM roles,
-terminate environments or access future database secrets. Some Beanstalk describe
+terminate environments or access future database secrets. Beanstalk also requires `s3:CreateBucket` on its exact Ohio service bucket during
+updates, even when that bucket already exists. No bucket-policy mutation is granted.
+Some Beanstalk describe
 APIs require read-only wildcard resources; these are region-restricted.
 Beanstalk runtime roles use AWS's standard WebTier and EnhancedHealth managed
 policies; those are broader than the application deployment role and do not belong
