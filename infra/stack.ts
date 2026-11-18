@@ -127,6 +127,17 @@ export class IntexStack extends Stack {
         'aws:ResourceTag/elasticbeanstalk:environment-name': 'intex-dev',
       } },
     }));
+    // ACL metadata checks also cover EB marker/manifest objects outside the app prefix.
+    // This does not permit reading their object bodies or changing their ACLs.
+    deployRole.addToPolicy(new iam.PolicyStatement({
+      actions: ['s3:GetObjectAcl'],
+      resources: [`arn:${this.partition}:s3:::elasticbeanstalk-${this.region}-${this.account}/*`],
+    }));
+    // These discovery APIs cannot be restricted to individual resources.
+    deployRole.addToPolicy(new iam.PolicyStatement({
+      actions: ['autoscaling:DescribeAutoScalingGroups', 'ec2:DescribeInstances'],
+      resources: ['*'], conditions: regionCondition,
+    }));
     const topic = new sns.Topic(this, 'Alerts');
     topic.addSubscription(new subscriptions.EmailSubscription(email.valueAsString));
     const alarm = new cw.Alarm(this, 'HealthAlarm', {
