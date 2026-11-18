@@ -78,14 +78,14 @@ export class IntexStack extends Stack {
         option('aws:elasticbeanstalk:command', 'DeploymentPolicy', 'AllAtOnce'),
         option('aws:elasticbeanstalk:command', 'Timeout', '600'),
         option('aws:elasticbeanstalk:healthreporting:system', 'SystemType', 'enhanced'),
-        option('aws:elasticbeanstalk:healthreporting:system', 'ConfigDocument', JSON.stringify({ Version: 1, CloudWatchMetrics: { Environment: { EnvironmentHealth: {} } } })),
         option('aws:elasticbeanstalk:cloudwatch:logs', 'StreamLogs', 'true'),
         option('aws:elasticbeanstalk:cloudwatch:logs', 'RetentionInDays', '7'),
         option('aws:elasticbeanstalk:cloudwatch:logs', 'DeleteOnTerminate', 'true'),
         option('aws:elasticbeanstalk:managedactions', 'ManagedActionsEnabled', 'false'),
       ],
     });
-    environment.addResourceDependency(profile);
+    // The instance's source-bundle permission must exist before EC2 bootstraps.
+    environment.node.addDependency(instanceRole.node.findChild('DefaultPolicy'));
     const deployRole = new iam.Role(this, 'GitHubDeployRole', {
       assumedBy: new iam.FederatedPrincipal(providerArn, { StringEquals: {
         'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
