@@ -35,7 +35,7 @@ jobs:
       - run: npm ci && npm run check && npm test && npm audit --audit-level=high
       - run: npm ci --prefix infra && npm --prefix infra run check && npm --prefix infra test && npm --prefix infra run synth
       - run: bash scripts/bundle.sh "$VERSION"
-      - uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-2
