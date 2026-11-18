@@ -123,8 +123,9 @@ gh api repos/nickgcioffi/intex/actions/oidc/customization/sub
 For this repository the allowed subject is:
 `repo:nickgcioffi@206786338/intex@1460597852:ref:refs/heads/main`.
 Forks, PR refs, feature branches and other repositories cannot assume this role.
-The role can write only `releases/*` in its artifact bucket, create INTEX application
-versions and update `intex-dev`; it cannot provision infrastructure, pass IAM roles,
+The role can write `releases/*` in its artifact bucket and INTEX-only application
+runtime paths in the regional service bucket, create INTEX application versions and
+update `intex-dev`; it cannot provision infrastructure, pass IAM roles,
 terminate environments or access future database secrets. Beanstalk also checks `s3:CreateBucket` and reasserts ownership controls on its exact
 Ohio service bucket during updates, even when that bucket already exists. This is
 an account/region-wide service bucket and can be shared with other applications.
@@ -133,6 +134,10 @@ add the INTEX instance role to its policy during environment creation; preserve 
 other application grants and objects. Obtain explicit owner approval before allowing
 shared bucket ownership/ACL/policy maintenance. Only add downstream actions actually
 required by tested deployment, scoped to this exact bucket.
+Runtime copy operations also require bucket listing and object ACL writes on the
+INTEX runtime paths. Direct object access to CougarCalc paths is not granted.
+Read-only CloudFormation template/stack diagnostics are limited to Beanstalk stacks
+carrying both `Project=intex` and `elasticbeanstalk:environment-name=intex-dev`.
 Some Beanstalk describe
 APIs require read-only wildcard resources; these are region-restricted.
 Beanstalk runtime roles use AWS's standard WebTier and EnhancedHealth managed

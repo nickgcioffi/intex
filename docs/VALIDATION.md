@@ -65,3 +65,23 @@ is shared with CougarCalc. The approved environment creation automatically added
 the INTEX instance role to the existing bucket policy. Existing CougarCalc grants
 and objects remain present. Further shared-bucket maintenance requires explicit
 approval; no unrelated objects have been deleted.
+
+## Paused at owner request
+
+The owner requested a safe stop before losing internet access. Automatic `Deploy main`
+was disabled; scheduled HTTP health monitoring remains enabled. The application still
+serves the known-good operator smoke release. Beanstalk can report Red after the failed
+update even while that release serves HTTP successfully. No teardown was performed.
+
+GitHub OIDC, artifact upload and application-version registration succeeded. Actual
+deployment attempts identified downstream S3 runtime/ACL and internal CloudFormation
+read requirements, tracked in PR #7. The latest prepared correction adds `s3:GetObjectAcl`
+on INTEX source/runtime objects and tag-scoped `cloudformation:DescribeStackResource`;
+it passed five CDK assertions, type checking, synthesis and cfn-lint but has not yet
+been applied or tested through GitHub. The end-to-end deployment is not complete.
+
+Resume: review PR #7 and the current deployed policy, apply its remaining IAM-only
+change through a reviewed CloudFormation change set, enable `deploy.yml` with
+`gh workflow enable deploy.yml`, and retry run `44403190311`. Verify Ready/Green and
+the exact served release, then compare the shared bucket with the saved baseline.
+Keep CougarCalc objects/grants intact. SNS confirmation remains a manual owner step.

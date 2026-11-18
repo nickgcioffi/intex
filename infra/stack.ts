@@ -100,7 +100,7 @@ export class IntexStack extends Stack {
     deployRole.addToPolicy(new iam.PolicyStatement({ actions: ['elasticbeanstalk:UpdateEnvironment'], resources: [envArn, versionArn], conditions: regionCondition }));
     // Describe APIs do not all support resource-level authorization; read only.
     deployRole.addToPolicy(new iam.PolicyStatement({ actions: ['elasticbeanstalk:DescribeEnvironments', 'elasticbeanstalk:DescribeEvents', 'elasticbeanstalk:DescribeApplicationVersions'], resources: ['*'], conditions: regionCondition }));
-    deployRole.addToPolicy(new iam.PolicyStatement({ actions: ['s3:PutObject', 's3:GetObject'], resources: [artifacts.arnForObjects('releases/*')] }));
+    deployRole.addToPolicy(new iam.PolicyStatement({ actions: ['s3:PutObject', 's3:GetObject', 's3:GetObjectAcl'], resources: [artifacts.arnForObjects('releases/*')] }));
     deployRole.addToPolicy(new iam.PolicyStatement({ actions: ['s3:ListBucket', 's3:GetBucketLocation'], resources: [artifacts.bucketArn] }));
     // UpdateEnvironment checks/ensures its regional EB service bucket even when it exists.
     deployRole.addToPolicy(new iam.PolicyStatement({
@@ -111,7 +111,7 @@ export class IntexStack extends Stack {
     // Beanstalk copies application bundles/extensions into its regional runtime store.
     // The environment ID is allocated by EB; the application segment remains exact.
     deployRole.addToPolicy(new iam.PolicyStatement({
-      actions: ['s3:GetObject', 's3:PutObject', 's3:PutObjectAcl'],
+      actions: ['s3:GetObject', 's3:GetObjectAcl', 's3:PutObject', 's3:PutObjectAcl'],
       resources: [
         `arn:${this.partition}:s3:::elasticbeanstalk-${this.region}-${this.account}/resources/environments/*/_runtime/*/intex/*`,
         `arn:${this.partition}:s3:::elasticbeanstalk-${this.region}-${this.account}/resources/_runtime/*/intex/*`,
@@ -119,7 +119,7 @@ export class IntexStack extends Stack {
     }));
     // EB's allocated stack ID changes on rebuild; require both project and env tags.
     deployRole.addToPolicy(new iam.PolicyStatement({
-      actions: ['cloudformation:GetTemplate', 'cloudformation:DescribeStacks', 'cloudformation:DescribeStackResources'],
+      actions: ['cloudformation:GetTemplate', 'cloudformation:DescribeStacks', 'cloudformation:DescribeStackResource', 'cloudformation:DescribeStackResources'],
       resources: [`arn:${this.partition}:cloudformation:${this.region}:${this.account}:stack/awseb-e-*-stack/*`],
       conditions: { StringEquals: {
         'aws:RequestedRegion': 'us-east-2',

@@ -33,3 +33,16 @@ test('enhanced health service policy uses the AWS service-role path', () => {
     'Fn::Join': Match.arrayWith([Match.arrayWith([Match.stringLikeRegexp('.*policy/service-role/AWSElasticBeanstalkEnhancedHealth')])]),
   })]) });
 });
+
+test('internal stack diagnostics require both project and exact environment tags', () => {
+  template().hasResourceProperties('AWS::IAM::Policy', {
+    PolicyDocument: { Statement: Match.arrayWith([Match.objectLike({
+      Action: ['cloudformation:GetTemplate', 'cloudformation:DescribeStacks', 'cloudformation:DescribeStackResource', 'cloudformation:DescribeStackResources'],
+      Condition: { StringEquals: {
+        'aws:RequestedRegion': 'us-east-2',
+        'aws:ResourceTag/Project': 'intex',
+        'aws:ResourceTag/elasticbeanstalk:environment-name': 'intex-dev',
+      } },
+    })]) },
+  });
+});
