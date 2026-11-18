@@ -51,3 +51,17 @@ recorded in [PR #2](https://github.com/nickgcioffi/intex/pull/2) and its linked 
 runs. A successful operator smoke test alone is not evidence of an OIDC exchange.
 SNS alarm delivery also requires the owner to confirm the latest subscription email.
 No RDS/database connectivity or destructive teardown test was performed.
+
+## GitHub OIDC deployment validation
+
+PR #2 was merged with explicit owner approval. Run `44403190311` successfully
+exchanged GitHub OIDC credentials, uploaded the bundle and registered its version.
+The initial deploy attempts were denied by Beanstalk's regional service-bucket
+checks (`s3:CreateBucket`, then `s3:PutBucketOwnershipControls`). PR #7 tracks the
+scoped correction.
+
+Inspection confirmed `elasticbeanstalk-us-east-2-600138214348` predates INTEX and
+is shared with CougarCalc. The approved environment creation automatically added
+the INTEX instance role to the existing bucket policy. Existing CougarCalc grants
+and objects remain present. Further shared-bucket maintenance requires explicit
+approval; no unrelated objects have been deleted.

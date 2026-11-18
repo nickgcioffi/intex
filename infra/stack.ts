@@ -104,7 +104,7 @@ export class IntexStack extends Stack {
     deployRole.addToPolicy(new iam.PolicyStatement({ actions: ['s3:ListBucket', 's3:GetBucketLocation'], resources: [artifacts.bucketArn] }));
     // UpdateEnvironment checks/ensures its regional EB service bucket even when it exists.
     deployRole.addToPolicy(new iam.PolicyStatement({
-      actions: ['s3:CreateBucket'],
+      actions: ['s3:CreateBucket', 's3:PutBucketOwnershipControls'],
       resources: [`arn:${this.partition}:s3:::elasticbeanstalk-${this.region}-${this.account}`],
       conditions: regionCondition,
     }));
