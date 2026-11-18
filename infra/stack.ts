@@ -15,6 +15,13 @@ export class IntexStack extends Stack {
     this.templateOptions.description = 'Dedicated INTEX single-instance Node.js deployment. No database, NAT or load balancer.';
     Tags.of(this).add('Project', 'intex');
     const email = new CfnParameter(this, 'AlertEmail', { type: 'String', allowedPattern: '[^@\\s]+@[^@\\s]+\\.[^@\\s]+', description: 'Team owner email for budget and health alerts.' });
+    const environmentEnabled = new CfnParameter(this, 'EnvironmentEnabled', {
+      type: 'String', default: 'true', allowedValues: ['true', 'false'],
+      description: 'false removes only the live environment and health alarm; the CI/CD foundation remains.',
+    });
+    const environmentActive = new CfnCondition(this, 'EnvironmentActive', {
+      expression: Fn.conditionEquals(environmentEnabled.valueAsString, 'true'),
+    });
     const runtimeEnvironmentId = new CfnParameter(this, 'RuntimeEnvironmentId', { type: 'String', default: 'unconfigured', allowedPattern: '(unconfigured|e-[a-z0-9]+)', description: 'After initial environment creation, bind its actual EB EnvironmentId before enabling GitHub deployment.' });
     const createProvider = new CfnParameter(this, 'CreateOidcProvider', { type: 'String', default: 'false', allowedValues: ['true', 'false'], description: 'Set true ONLY after confirming the account has no GitHub OIDC provider.' });
     const providerCondition = new CfnCondition(this, 'NeedsProvider', { expression: Fn.conditionEquals(createProvider.valueAsString, 'true') });
@@ -85,6 +92,7 @@ export class IntexStack extends Stack {
         option('aws:elasticbeanstalk:managedactions', 'ManagedActionsEnabled', 'false'),
       ],
     });
+    environment.cfnOptions.condition = environmentActive;
     // The instance's source-bundle permission must exist before EC2 bootstraps.
     environment.node.addDependency(instanceRole.node.findChild('DefaultPolicy'));
     const deployRole = new iam.Role(this, 'GitHubDeployRole', {
@@ -166,11 +174,12 @@ export class IntexStack extends Stack {
       threshold: 10, comparisonOperator: cw.ComparisonOperator.GREATER_THAN_THRESHOLD, evaluationPeriods: 2,
       treatMissingData: cw.TreatMissingData.MISSING,
     });
+    (alarm.node.defaultChild as cw.CfnAlarm).cfnOptions.condition = environmentActive;
     alarm.addAlarmAction(new actions.SnsAction(topic));
     new budgets.CfnBudget(this, 'MonthlyBudget', {
       budget: { budgetName: 'intex-us-east-2', budgetType: 'COST', timeUnit: 'MONTHLY', budgetLimit: { amount: 20, unit: 'USD' }, costFilters: { Region: ['us-east-2'] } },
       notificationsWithSubscribers: [80, 100].map(threshold => ({ notification: { notificationType: 'ACTUAL', comparisonOperator: 'GREATER_THAN', threshold, thresholdType: 'PERCENTAGE' }, subscribers: [{ subscriptionType: 'EMAIL', address: email.valueAsString }] })),
     });
-    for (const [key, value] of Object.entries({ DeployRoleArn: deployRole.roleArn, ArtifactBucket: artifacts.bucketName, RuntimeEnvironmentId: runtimeEnvironmentId.valueAsString, ApplicationName: application.ref, EnvironmentName: environment.ref, Endpoint: `http://${environment.attrEndpointUrl}`, VpcId: vpc.vpcId, FutureDatabaseSecurityGroup: dbSg.securityGroupId, IsolatedDatabaseSubnets: vpc.isolatedSubnets.map(s => s.subnetId).join(',') })) new CfnOutput(this, `${key}Output`, { value }).overrideLogicalId(key);
+    for (const [key, value] of Object.entries({ EnvironmentEnabled: environmentEnabled.valueAsString, DeployRoleArn: deployRole.roleArn, ArtifactBucket: artifacts.bucketName, RuntimeEnvironmentId: runtimeEnvironmentId.valueAsString, ApplicationName: application.ref, EnvironmentName: environment.ref, Endpoint: `http://${environment.attrEndpointUrl}`, VpcId: vpc.vpcId, FutureDatabaseSecurityGroup: dbSg.securityGroupId, IsolatedDatabaseSubnets: vpc.isolatedSubnets.map(s => s.subnetId).join(',') })) new CfnOutput(this, `${key}Output`, { value, condition: ['EnvironmentName', 'Endpoint'].includes(key) ? environmentActive : undefined }).overrideLogicalId(key);
   }
 }

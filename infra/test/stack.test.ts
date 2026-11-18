@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import assert from 'node:assert/strict';
 import { App } from 'aws-cdk-lib';
 import { Template, Match } from 'aws-cdk-lib/assertions';
 import { IntexStack } from '../stack.js';
@@ -45,4 +46,16 @@ test('internal stack diagnostics require both project and exact environment tags
       } },
     })]) },
   });
+});
+
+test('dormancy removes only live environment and health alarm, preserving foundation', () => {
+  const t = template();
+  const json = t.toJSON();
+  assert.deepEqual(json.Conditions.EnvironmentActive, { 'Fn::Equals': [{ Ref: 'EnvironmentEnabled' }, 'true'] });
+  const conditional = Object.values(json.Resources as Record<string, { Type: string; Condition?: string }>)
+    .filter(resource => resource.Condition === 'EnvironmentActive').map(resource => resource.Type).sort();
+  assert.deepEqual(conditional, ['AWS::CloudWatch::Alarm', 'AWS::ElasticBeanstalk::Environment']);
+  for (const output of ['Endpoint', 'EnvironmentName']) assert.equal(json.Outputs[output].Condition, 'EnvironmentActive');
+  for (const output of ['DeployRoleArn', 'ArtifactBucket', 'VpcId', 'ApplicationName']) assert.equal(json.Outputs[output].Condition, undefined);
+  assert.equal(json.Parameters.EnvironmentEnabled.Default, 'true');
 });

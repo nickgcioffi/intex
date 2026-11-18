@@ -77,3 +77,15 @@ not yet part of deployment verification.
 See [the operations runbook](docs/OPERATIONS.md) for AWS setup, GitHub configuration,
 team onboarding, testing, rollback, PostgreSQL preparation, costs and teardown.
 See [validation evidence](docs/VALIDATION.md) for what has actually been verified.
+
+## Before INTEX starts: November 30, 2026
+
+The deployment foundation is already implemented and has passed a real GitHub OIDC
+deployment. It can remain dormant before the project starts: PR checks continue,
+while the application environment and its running-server costs are removed through
+an explicit `EnvironmentEnabled=false` infrastructure change. IAM/OIDC, networking,
+artifacts, application versions, the confirmed SNS subscription and budget remain.
+
+See [dormancy and November 30 activation](docs/DORMANCY.md). Deactivation requires
+approval before resource removal; activation requires approval before paid resources
+are recreated. No automatic November 30 provisioning is scheduled.

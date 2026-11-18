@@ -91,3 +91,13 @@ bodies. Preserve this bucket during project teardown.
   using real credentials or sensitive data.
 - Planning allowance: $13–17/month before credits, taxes and variable usage. The
   $20 regional budget is an alert, not a spending cap, and includes other Ohio costs.
+
+## Dormant-mode preparation
+
+A separate change adds `EnvironmentEnabled` with a compatibility default of `true`.
+Only the live Beanstalk environment and health alarm depend on its active condition;
+references in environment-specific outputs carry the same condition. Foundation
+resources remain unconditional. Six CDK assertions, type checks, synthesis and
+cfn-lint pass for this change. The dormant change set must be reviewed and explicitly
+approved before execution; source ZIPs and application-version history are retained.
+The November 30 activation checklist is in `docs/DORMANCY.md`.
