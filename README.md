@@ -54,3 +54,26 @@ Supporting Services:
 ### Cost Management
 
 The project uses AWS promotional credits to offset eligible infrastructure expenses. Resources should be sized appropriately, monitored through AWS Budgets, and terminated when no longer needed.
+
+## CI/CD implementation
+
+The architecture above is the project roadmap. The initial implementation deliberately
+runs **only a placeholder application**; **RDS is not provisioned** and PostgreSQL is
+not yet part of deployment verification.
+
+- Node.js 26 / Express: `npm ci`, `npm test`, `npm start` (port 5000).
+- `GET /health` returns `{"status":"ok","version":"local"}` locally and the release
+  identifier when deployed. `GET /` identifies the project.
+- Pull requests run application tests, dependency audits, CDK checks, infrastructure
+  assertions, synthesis and deployment packaging without AWS credentials.
+- Pushes to `main` repeat checks, obtain a short-lived AWS role through GitHub OIDC,
+  upload a versioned bundle, deploy to `intex-dev` in `us-east-2`, and verify both
+  Beanstalk health and the exact release served by `/health`.
+- Deployment is intentionally inactive until the owner approves infrastructure,
+  provisions the stack and sets `DEPLOY_ENABLED=true` in GitHub repository variables.
+- The single-instance environment uses HTTP and accepts brief downtime during
+  deployment. Add TLS before using real credentials or sensitive application data.
+
+See [the operations runbook](docs/OPERATIONS.md) for AWS setup, GitHub configuration,
+team onboarding, testing, rollback, PostgreSQL preparation, costs and teardown.
+See [validation evidence](docs/VALIDATION.md) for what has actually been verified.

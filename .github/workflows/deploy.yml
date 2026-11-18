@@ -1,0 +1,55 @@
+name: Deploy main
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: intex-dev-deployment
+  cancel-in-progress: false
+jobs:
+  deploy:
+    # Activation happens only after paid-resource approval and infrastructure setup.
+    if: github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARTIFACT_BUCKET: ${{ vars.ARTIFACT_BUCKET }}
+      VERSION: git-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            infra/package-lock.json
+      # Revalidate this exact main commit before requesting AWS credentials.
+      - run: npm ci && npm run check && npm test && npm audit --audit-level=high
+      - run: npm ci --prefix infra && npm --prefix infra run check && npm --prefix infra test && npm --prefix infra run synth
+      - run: bash scripts/bundle.sh "$VERSION"
+      - uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-2
+          role-session-name: intex-${{ github.run_id }}
+          allowed-account-ids: ${{ vars.AWS_ACCOUNT_ID }}
+          role-duration-seconds: 1800
+      - run: aws sts get-caller-identity
+      - run: bash scripts/deploy.sh
+      - name: Deployment events on failure
+        if: failure()
+        run: aws elasticbeanstalk describe-events --environment-name intex-dev --max-records 20 --output table
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: deployment-${{ github.run_id }}-${{ github.run_attempt }}
+          path: dist/
+          retention-days: 7

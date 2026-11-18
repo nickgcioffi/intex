@@ -1,0 +1,39 @@
+{
+  "name": "intex",
+  "version": "1.0.0",
+  "description": "The INTEX project for BYU IS Fall 2026",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "test"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js",
+    "check": "node --check src/app.js && node --check src/server.js && node --check src/database.js",
+    "bundle": "bash scripts/bundle.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nickgcioffi/intex.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/nickgcioffi/intex/issues"
+  },
+  "homepage": "https://github.com/nickgcioffi/intex#readme",
+  "dependencies": {
+    "express": "5.3.0",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "supertest": "7.3.2"
+  },
+  "private": true,
+  "engines": {
+    "node": "26.x"
+  }
+}
