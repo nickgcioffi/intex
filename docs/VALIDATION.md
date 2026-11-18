@@ -1,87 +1,93 @@
 # Validation evidence
 
-Implementation started 2026-11-18 from main commit `95c911b`.
+Validated 2026-11-18. Implementation began from main commit `95c911b`.
 
-- GitHub repository read/write and Actions permissions verified independently.
-- AWS account identity verified after explicit user-approved browser sign-in:
-  account `600138214348`, IAM user `nickgboff`, profile `intex`.
-- Read-only discovery: no existing GitHub OIDC providers and no active CloudFormation
-  stacks in `us-east-2` at preflight. Node.js 26 AL2023 v6.12.3 is available.
-- IAM simulator allowed key CloudFormation/IAM/Beanstalk/EC2/S3/Budgets creation
-  actions. This is not proof of every deployment permission or account quota.
-- Actual immutable GitHub OIDC subject prefix obtained through the repository API:
-  `repo:nickgcioffi@206786338/intex@1460597852`.
+## End-to-end deployment
 
-Application tests, CDK assertions, packaging, GitHub CI and live deployment evidence
-are updated below as validation completes. Provisioning requires explicit approval;
-no live deployment or OIDC success should be inferred from synthesized templates.
+[Deploy main run 44403190311, attempt 10](https://github.com/nickgcioffi/intex/actions/runs/44403190311/attempts/10)
+completed successfully. It revalidated the main commit, exchanged GitHub OIDC for
+short-lived AWS credentials, uploaded the release, registered a Beanstalk application
+version, updated the environment, waited for Ready/Green and verified the exact
+release over HTTP.
 
-## Verified results
+Verified release:
+`git-97dd7ecf543e16ac127b41481e884a450219ddd5-44403190311-10`.
 
-- Eight application/deployment tests pass, including real HTTP health/version checks,
-  opt-in PostgreSQL/TLS configuration, a busy-environment guard, AWS denial handling
-  and invalid artifact configuration. AWS control-plane unit tests use mocks.
-- Four CDK assertions pass; TypeScript checking, synthesis, `cfn-lint 1.60.1`, AWS
-  `validate-template`, shell syntax and source-bundle integrity checks pass.
-- The extracted production ZIP was installed with production dependencies only and
-  served the expected release without a database. No credentials, IaC, `.git` or
-  `node_modules` were packaged.
-- GitHub Actions PR validation passed on the implementation branch, including the
-  real Ubuntu-runner application/CDK tests, audit gates, synthesis and template linting.
-- Live AWS creation exposed an incorrect enhanced-health managed-policy path. It was
-  corrected to `service-role/AWSElasticBeanstalkEnhancedHealth`, regression tested, and
-  the failed stack was removed with explicit owner approval before successful retry.
-- `IntexPipeline` reached `CREATE_COMPLETE` in `us-east-2`. Its approved GitHub OIDC
-  provider was retained from the failed attempt and is reused (`CreateOidcProvider=false`).
-- Actual topology verified: one running `t3.micro`, IMDSv2 required, no load balancer,
-  seven-day CloudWatch log groups, a health alarm and a $20 Ohio budget.
-- Actual deployed IAM trust was inspected. IAM simulation allowed INTEX application
-  version creation/update and denied an unrelated environment update, environment
-  termination, CloudFormation stack creation and `iam:PassRole`.
-- Operator-credential live smoke deployment succeeded for release
-  `smoke-8a4c9a101def17cafa8b473dd579b07a052690ec-1795037356`.
-  Beanstalk was Ready/Green with the matching VersionLabel and HTTP `/health` returned
-  that same release identifier.
-- GitHub repository variables were configured from the deployed stack. No static
-  AWS access keys were added to GitHub.
+Live health: <http://intex-dev.eba-yv2pttdh.us-east-2.elasticbeanstalk.com/health>.
+Enhanced health reported one healthy instance and application update complete.
 
-Live URL: <http://intex-dev.eba-yv2pttdh.us-east-2.elasticbeanstalk.com/health>.
-The definitive GitHub OIDC/main deployment run and latest validation status are
-recorded in [PR #2](https://github.com/nickgcioffi/intex/pull/2) and its linked Actions
-runs. A successful operator smoke test alone is not evidence of an OIDC exchange.
-SNS alarm delivery also requires the owner to confirm the latest subscription email.
-No RDS/database connectivity or destructive teardown test was performed.
+PR #2 was merged with explicit owner approval. PR #7 records the downstream
+permissions discovered during live validation, the environment-ID binding, the
+fail-fast deployment error check, and the updated operations runbook. Consult its
+linked Actions checks for the latest source revision and subsequent deployment run.
 
-## GitHub OIDC deployment validation
+## Application and infrastructure checks
 
-PR #2 was merged with explicit owner approval. Run `44403190311` successfully
-exchanged GitHub OIDC credentials, uploaded the bundle and registered its version.
-The initial deploy attempts were denied by Beanstalk's regional service-bucket
-checks (`s3:CreateBucket`, then `s3:PutBucketOwnershipControls`). PR #7 tracks the
-scoped correction.
+- Nine application/deployment tests pass: health/version, routes, opt-in PostgreSQL,
+  verified TLS configuration, busy-environment rejection, synchronous AWS denial,
+  exact HTTP verification after a mocked AWS update, invalid artifact configuration,
+  and prompt failure on asynchronous Beanstalk errors. Control-plane unit tests use
+  mocks; the end-to-end run above used real AWS.
+- Five CDK assertions pass, covering single-instance/no-RDS/no-NAT/no-ALB sizing,
+  exact immutable OIDC subject, private artifacts/monitoring, the AWS enhanced-health
+  policy path and internal stack tag restrictions.
+- TypeScript checking, CDK synthesis, cfn-lint 1.60.1, AWS validate-template,
+  shell syntax and source-bundle integrity passed.
+- The extracted deployment ZIP ran using production dependencies only and returned
+  its packaged release. No credentials, IaC, `.git` or `node_modules` were bundled.
+- GitHub pull-request validation ran successfully on Ubuntu. The manually dispatched
+  [health-monitor workflow](https://github.com/nickgcioffi/intex/actions/runs/44404374201)
+  also passed against the live environment.
+- The application dependency audit has no findings. CDK tooling has a documented
+  moderate bundled minimatch advisory; there are no high/critical audit findings.
 
-Inspection confirmed `elasticbeanstalk-us-east-2-600138214348` predates INTEX and
-is shared with CougarCalc. The approved environment creation automatically added
-the INTEX instance role to the existing bucket policy. Existing CougarCalc grants
-and objects remain present. Further shared-bucket maintenance requires explicit
-approval; no unrelated objects have been deleted.
+## AWS access, resources and IAM
 
-## Paused at owner request
+- AWS access was verified independently of GitHub after owner-approved sign-in:
+  account `600138214348`, IAM user `nickgboff`, local profile `intex`.
+- The supported Node.js 26 AL2023 v6.12.3 platform was confirmed through AWS.
+- `IntexPipeline` creation and subsequent IAM-only updates completed successfully.
+  The enhanced-health policy path is `service-role/AWSElasticBeanstalkEnhancedHealth`.
+- Actual topology: one t3.micro, 10 GiB gp3, one public IPv4 address, IMDSv2 required,
+  no load balancer, no NAT gateway and no database. Auto Scaling min/max/desired are
+  all 1; no processes remained suspended after deployment.
+- Application logs arrived in CloudWatch with seven-day retention. The
+  EnvironmentHealth metric, health alarm and $20 Ohio budget were verified.
+- The actual GitHub subject prefix was obtained from the repository API:
+  `repo:nickgcioffi@206786338/intex@1460597852`. Trust requires the full main-branch
+  subject and audience `sts.amazonaws.com`. The real workflow's OIDC exchange passed.
+- CloudTrail from the successful operator smoke deployment established the required
+  downstream API calls. Stack update and Auto Scaling process permissions were
+  explicitly approved by the owner after automatic approval review requested
+  additional authorization. They are bound to environment `e-8fetrwpb5e`, Project
+  `intex`, environment name `intex-dev`, and region `us-east-2`.
+- IAM Access Analyzer validated the deployed identity policy with zero findings.
+- Final IAM simulations denied reading/writing/deleting CougarCalc object bodies,
+  updating an unrelated stack, creating a stack, passing IAM roles, launching EC2
+  and terminating the INTEX environment. No static AWS access keys were added to GitHub.
 
-The owner requested a safe stop before losing internet access. Automatic `Deploy main`
-was disabled; scheduled HTTP health monitoring remains enabled. The application still
-serves the known-good operator smoke release. Beanstalk can report Red after the failed
-update even while that release serves HTTP successfully. No teardown was performed.
+## Shared regional service bucket
 
-GitHub OIDC, artifact upload and application-version registration succeeded. Actual
-deployment attempts identified downstream S3 runtime/ACL and internal CloudFormation
-read requirements, tracked in PR #7. The latest prepared correction adds `s3:GetObjectAcl`
-on INTEX source/runtime objects and tag-scoped `cloudformation:DescribeStackResource`;
-it passed five CDK assertions, type checking, synthesis and cfn-lint but has not yet
-been applied or tested through GitHub. The end-to-end deployment is not complete.
+`elasticbeanstalk-us-east-2-600138214348` predates INTEX and contains CougarCalc data.
+Beanstalk environment creation automatically added the INTEX instance role to its
+existing bucket policy. That dependency was disclosed; the owner explicitly approved
+subsequent scoped maintenance while requiring CougarCalc preservation.
 
-Resume: review PR #7 and the current deployed policy, apply its remaining IAM-only
-change through a reviewed CloudFormation change set, enable `deploy.yml` with
-`gh workflow enable deploy.yml`, and retry run `44403190311`. Verify Ready/Green and
-the exact served release, then compare the shared bucket with the saved baseline.
-Keep CougarCalc objects/grants intact. SNS confirmation remains a manual owner step.
+After the successful GitHub deployment, comparison with the saved pre-maintenance
+baseline found all 18 protected/non-INTEX objects unchanged by key, ETag and size.
+The bucket policy, ownership controls and public-access settings were also unchanged
+from that baseline. INTEX runtime copies/manifests changed as expected. The deployment
+role can read shared ACL metadata, but cannot read/write/delete CougarCalc object
+bodies. Preserve this bucket during project teardown.
+
+## Remaining manual steps and limits
+
+- Confirm the latest SNS subscription email; the subscription was still pending
+  confirmation at final inspection. Alarm email delivery is not claimed as tested.
+- Review/merge the scoped fix in PR #7 and require PR approvals/status checks on main
+  according to team policy. No unreviewed changes were pushed directly to main.
+- No RDS connection, destructive teardown or database rollback test was performed.
+- The placeholder uses HTTP and all-at-once deployment downtime. Add TLS before
+  using real credentials or sensitive data.
+- Planning allowance: $13–17/month before credits, taxes and variable usage. The
+  $20 regional budget is an alert, not a spending cap, and includes other Ohio costs.
