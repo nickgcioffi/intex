@@ -108,6 +108,15 @@ export class IntexStack extends Stack {
       resources: [`arn:${this.partition}:s3:::elasticbeanstalk-${this.region}-${this.account}`],
       conditions: regionCondition,
     }));
+    // Beanstalk copies application bundles/extensions into its regional runtime store.
+    // The environment ID is allocated by EB; the application segment remains exact.
+    deployRole.addToPolicy(new iam.PolicyStatement({
+      actions: ['s3:GetObject', 's3:PutObject'],
+      resources: [
+        `arn:${this.partition}:s3:::elasticbeanstalk-${this.region}-${this.account}/resources/environments/*/_runtime/*/intex/*`,
+        `arn:${this.partition}:s3:::elasticbeanstalk-${this.region}-${this.account}/resources/_runtime/*/intex/*`,
+      ],
+    }));
     const topic = new sns.Topic(this, 'Alerts');
     topic.addSubscription(new subscriptions.EmailSubscription(email.valueAsString));
     const alarm = new cw.Alarm(this, 'HealthAlarm', {
