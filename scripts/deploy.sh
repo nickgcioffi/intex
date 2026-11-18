@@ -2,6 +2,7 @@
 set -euo pipefail
 : "${ARTIFACT_BUCKET:?Set ARTIFACT_BUCKET}"
 : "${VERSION:?Set VERSION}"
+[[ "$ARTIFACT_BUCKET" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]] || { echo 'Invalid ARTIFACT_BUCKET; wait for stack outputs and configure it' >&2; exit 1; }
 export AWS_DEFAULT_REGION=us-east-2
 export AWS_REGION=us-east-2
 export AWS_PAGER=''

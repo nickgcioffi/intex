@@ -54,3 +54,9 @@ test('deployment verifies the actual HTTP release after mocked AWS success', asy
   assert.match(calls, /s3:\/\/test-bucket\/releases\/test-release.zip/);
   assert.match(calls, /update-environment --environment-name intex-dev --version-label test-release/);
 });
+
+test('deployment rejects missing CloudFormation output before any AWS call', async (t) => {
+  const f = await fixture('ok', t);
+  f.env.ARTIFACT_BUCKET = 'None';
+  await assert.rejects(exec('bash', [deploy], f), /Invalid ARTIFACT_BUCKET/);
+});
