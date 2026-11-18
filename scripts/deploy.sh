@@ -19,6 +19,7 @@ aws elasticbeanstalk create-application-version --application-name "$app" --vers
 previous="$(aws elasticbeanstalk describe-environments --environment-names "$environment" --query 'Environments[0].VersionLabel' --output text)"
 printf 'Previous version: %s\nNew version: %s\n' "$previous" "$VERSION"
 # Wait for Ready + exact version + Green, then exercise the actual HTTP application.
+deployment_started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 aws elasticbeanstalk update-environment --environment-name "$environment" --version-label "$VERSION" --output json > dist/update.json
 for attempt in $(seq 1 90); do
   aws elasticbeanstalk describe-environments --environment-names "$environment" --output json > dist/environment.json
@@ -32,6 +33,18 @@ JS
     node scripts/verify-health.mjs "$endpoint" "$VERSION"
     printf 'Deployed %s to %s\n' "$VERSION" "$endpoint"
     exit 0
+  fi
+  # API acceptance is not deployment success: surface asynchronous service denials.
+  aws elasticbeanstalk describe-events --environment-name "$environment" --start-time "$deployment_started" --severity ERROR --output json > dist/errors.json
+  if ! node --input-type=module <<'JS'
+import fs from 'node:fs';
+const events = JSON.parse(fs.readFileSync('dist/errors.json')).Events || [];
+for (const event of events) console.error(event.Message);
+process.exit(events.length ? 1 : 0);
+JS
+  then
+    echo 'Beanstalk reported a deployment error; inspect the emitted events.' >&2
+    exit 1
   fi
   sleep 10
 done

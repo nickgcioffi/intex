@@ -15,6 +15,7 @@ export class IntexStack extends Stack {
     this.templateOptions.description = 'Dedicated INTEX single-instance Node.js deployment. No database, NAT or load balancer.';
     Tags.of(this).add('Project', 'intex');
     const email = new CfnParameter(this, 'AlertEmail', { type: 'String', allowedPattern: '[^@\\s]+@[^@\\s]+\\.[^@\\s]+', description: 'Team owner email for budget and health alerts.' });
+    const runtimeEnvironmentId = new CfnParameter(this, 'RuntimeEnvironmentId', { type: 'String', default: 'unconfigured', allowedPattern: '(unconfigured|e-[a-z0-9]+)', description: 'After initial environment creation, bind its actual EB EnvironmentId before enabling GitHub deployment.' });
     const createProvider = new CfnParameter(this, 'CreateOidcProvider', { type: 'String', default: 'false', allowedValues: ['true', 'false'], description: 'Set true ONLY after confirming the account has no GitHub OIDC provider.' });
     const providerCondition = new CfnCondition(this, 'NeedsProvider', { expression: Fn.conditionEquals(createProvider.valueAsString, 'true') });
     const oidc = new iam.CfnOIDCProvider(this, 'GitHubProvider', {
@@ -100,8 +101,64 @@ export class IntexStack extends Stack {
     deployRole.addToPolicy(new iam.PolicyStatement({ actions: ['elasticbeanstalk:UpdateEnvironment'], resources: [envArn, versionArn], conditions: regionCondition }));
     // Describe APIs do not all support resource-level authorization; read only.
     deployRole.addToPolicy(new iam.PolicyStatement({ actions: ['elasticbeanstalk:DescribeEnvironments', 'elasticbeanstalk:DescribeEvents', 'elasticbeanstalk:DescribeApplicationVersions'], resources: ['*'], conditions: regionCondition }));
-    deployRole.addToPolicy(new iam.PolicyStatement({ actions: ['s3:PutObject', 's3:GetObject'], resources: [artifacts.arnForObjects('releases/*')] }));
+    deployRole.addToPolicy(new iam.PolicyStatement({ actions: ['s3:PutObject', 's3:GetObject', 's3:GetObjectAcl'], resources: [artifacts.arnForObjects('releases/*')] }));
     deployRole.addToPolicy(new iam.PolicyStatement({ actions: ['s3:ListBucket', 's3:GetBucketLocation'], resources: [artifacts.bucketArn] }));
+    // UpdateEnvironment checks/ensures its regional EB service bucket even when it exists.
+    deployRole.addToPolicy(new iam.PolicyStatement({
+      actions: ['s3:CreateBucket', 's3:PutBucketOwnershipControls', 's3:ListBucket', 's3:GetBucketPolicy', 's3:GetBucketLocation'],
+      resources: [`arn:${this.partition}:s3:::elasticbeanstalk-${this.region}-${this.account}`],
+      conditions: regionCondition,
+    }));
+    // Beanstalk copies application bundles/extensions into its regional runtime store.
+    // The environment ID is allocated by EB; the application segment remains exact.
+    deployRole.addToPolicy(new iam.PolicyStatement({
+      actions: ['s3:GetObject', 's3:GetObjectAcl', 's3:PutObject', 's3:PutObjectAcl', 's3:DeleteObject'],
+      resources: [
+        `arn:${this.partition}:s3:::elasticbeanstalk-${this.region}-${this.account}/resources/environments/${runtimeEnvironmentId.valueAsString}/_runtime/*`,
+        `arn:${this.partition}:s3:::elasticbeanstalk-${this.region}-${this.account}/resources/_runtime/*/intex/*`,
+      ],
+    }));
+    // EB's allocated stack ID changes on rebuild; require both project and env tags.
+    deployRole.addToPolicy(new iam.PolicyStatement({
+      actions: ['cloudformation:GetTemplate', 'cloudformation:DescribeStacks', 'cloudformation:DescribeStackResource', 'cloudformation:DescribeStackResources', 'cloudformation:DescribeStackEvents'],
+      resources: [`arn:${this.partition}:cloudformation:${this.region}:${this.account}:stack/awseb-${runtimeEnvironmentId.valueAsString}-stack/*`],
+      conditions: { StringEquals: {
+        'aws:RequestedRegion': 'us-east-2',
+        'aws:ResourceTag/Project': 'intex',
+        'aws:ResourceTag/elasticbeanstalk:environment-name': 'intex-dev',
+      } },
+    }));
+    // ACL metadata checks also cover EB marker/manifest objects outside the app prefix.
+    // This does not permit reading their object bodies or changing their ACLs.
+    deployRole.addToPolicy(new iam.PolicyStatement({
+      actions: ['s3:GetObjectAcl'],
+      resources: [`arn:${this.partition}:s3:::elasticbeanstalk-${this.region}-${this.account}/*`],
+    }));
+    // These discovery APIs cannot be restricted to individual resources.
+    deployRole.addToPolicy(new iam.PolicyStatement({
+      actions: ['autoscaling:DescribeAutoScalingGroups', 'autoscaling:DescribeScalingActivities',
+        'ec2:DescribeInstances', 'ec2:DescribeAddresses', 'ec2:DescribeAvailabilityZones',
+        'ec2:DescribeImages', 'ec2:DescribeSubnets', 'ec2:DescribeSecurityGroups',
+        'ec2:DescribeLaunchTemplates', 'ec2:DescribeLaunchTemplateVersions'],
+      resources: ['*'], conditions: regionCondition,
+    }));
+    // CloudTrail from the successful deployment shows these lifecycle calls.
+    deployRole.addToPolicy(new iam.PolicyStatement({
+      actions: ['cloudformation:UpdateStack'],
+      resources: [`arn:${this.partition}:cloudformation:${this.region}:${this.account}:stack/awseb-${runtimeEnvironmentId.valueAsString}-stack/*`],
+      conditions: { StringEquals: {
+        'aws:RequestedRegion': 'us-east-2', 'aws:ResourceTag/Project': 'intex',
+        'aws:ResourceTag/elasticbeanstalk:environment-name': 'intex-dev',
+      } },
+    }));
+    deployRole.addToPolicy(new iam.PolicyStatement({
+      actions: ['autoscaling:SuspendProcesses', 'autoscaling:ResumeProcesses'],
+      resources: [`arn:${this.partition}:autoscaling:${this.region}:${this.account}:autoScalingGroup:*:autoScalingGroupName/awseb-${runtimeEnvironmentId.valueAsString}-stack-AWSEBAutoScalingGroup-*`],
+      conditions: { StringEquals: {
+        'aws:RequestedRegion': 'us-east-2', 'autoscaling:ResourceTag/Project': 'intex',
+        'autoscaling:ResourceTag/elasticbeanstalk:environment-name': 'intex-dev',
+      } },
+    }));
     const topic = new sns.Topic(this, 'Alerts');
     topic.addSubscription(new subscriptions.EmailSubscription(email.valueAsString));
     const alarm = new cw.Alarm(this, 'HealthAlarm', {
@@ -114,6 +171,6 @@ export class IntexStack extends Stack {
       budget: { budgetName: 'intex-us-east-2', budgetType: 'COST', timeUnit: 'MONTHLY', budgetLimit: { amount: 20, unit: 'USD' }, costFilters: { Region: ['us-east-2'] } },
       notificationsWithSubscribers: [80, 100].map(threshold => ({ notification: { notificationType: 'ACTUAL', comparisonOperator: 'GREATER_THAN', threshold, thresholdType: 'PERCENTAGE' }, subscribers: [{ subscriptionType: 'EMAIL', address: email.valueAsString }] })),
     });
-    for (const [key, value] of Object.entries({ DeployRoleArn: deployRole.roleArn, ArtifactBucket: artifacts.bucketName, ApplicationName: application.ref, EnvironmentName: environment.ref, Endpoint: `http://${environment.attrEndpointUrl}`, VpcId: vpc.vpcId, FutureDatabaseSecurityGroup: dbSg.securityGroupId, IsolatedDatabaseSubnets: vpc.isolatedSubnets.map(s => s.subnetId).join(',') })) new CfnOutput(this, `${key}Output`, { value }).overrideLogicalId(key);
+    for (const [key, value] of Object.entries({ DeployRoleArn: deployRole.roleArn, ArtifactBucket: artifacts.bucketName, RuntimeEnvironmentId: runtimeEnvironmentId.valueAsString, ApplicationName: application.ref, EnvironmentName: environment.ref, Endpoint: `http://${environment.attrEndpointUrl}`, VpcId: vpc.vpcId, FutureDatabaseSecurityGroup: dbSg.securityGroupId, IsolatedDatabaseSubnets: vpc.isolatedSubnets.map(s => s.subnetId).join(',') })) new CfnOutput(this, `${key}Output`, { value }).overrideLogicalId(key);
   }
 }

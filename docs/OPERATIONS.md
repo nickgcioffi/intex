@@ -90,6 +90,24 @@ aws cloudformation describe-stacks --stack-name IntexPipeline \
   --region us-east-2 --query 'Stacks[0].Outputs'
 ```
 
+Before enabling GitHub deployment, bind its runtime permissions to the newly
+allocated environment ID (the default `unconfigured` fails closed):
+
+```bash
+runtime_environment_id="$(aws elasticbeanstalk describe-environments \
+  --environment-names intex-dev --region us-east-2 \
+  --query 'Environments[0].EnvironmentId' --output text)"
+aws cloudformation deploy --stack-name IntexPipeline \
+  --template-file infra/cdk.out/IntexPipeline.template.json \
+  --capabilities CAPABILITY_IAM --region us-east-2 \
+  --parameter-overrides RuntimeEnvironmentId="$runtime_environment_id"
+```
+
+For an existing stack, the CLI preserves other parameter values omitted from this
+update. Confirm the ID is a real `e-...` value, not `None`. Rebind after an environment
+rebuild. Only the deployment role policy changes; no database or extra instance is
+created. Current environment binding: `e-8fetrwpb5e`.
+
 On subsequent updates preserve `CreateOidcProvider=true` if this stack created it.
 Changing the condition can orphan the retained provider; do not toggle it casually.
 Keep the original alert email parameter for subsequent updates. Review a change set
@@ -123,9 +141,29 @@ gh api repos/nickgcioffi/intex/actions/oidc/customization/sub
 For this repository the allowed subject is:
 `repo:nickgcioffi@206786338/intex@1460597852:ref:refs/heads/main`.
 Forks, PR refs, feature branches and other repositories cannot assume this role.
-The role can write only `releases/*` in its artifact bucket, create INTEX application
-versions and update `intex-dev`; it cannot provision infrastructure, pass IAM roles,
-terminate environments or access future database secrets. Some Beanstalk describe
+The role can write `releases/*` in its artifact bucket and INTEX-only application
+runtime paths in the regional service bucket, create INTEX application versions and
+update `intex-dev`; it cannot create stacks, pass IAM roles, terminate environments or access future
+database secrets. Beanstalk may update only its existing, environment-bound internal
+stack with both INTEX tags and suspend/resume processes only on the matching tagged
+Auto Scaling group. No EC2 launch/terminate or Auto Scaling resize permission is granted. Beanstalk also checks `s3:CreateBucket` and reasserts ownership controls on its exact
+Ohio service bucket during updates, even when that bucket already exists. This is
+an account/region-wide service bucket and can be shared with other applications.
+Inspect its ownership, ACL, policy and contents before provisioning. Beanstalk may
+add the INTEX instance role to its policy during environment creation; preserve all
+other application grants and objects. Obtain explicit owner approval before allowing
+shared bucket ownership/ACL/policy maintenance. Only add downstream actions actually
+required by tested deployment, scoped to this exact bucket.
+Runtime operations require bucket metadata/policy reads, ACL metadata reads and
+read/write/ACL/cleanup access to the exact INTEX environment's `_runtime/` prefix
+and central application paths containing `/intex/`. Source ZIPs in the dedicated
+artifact bucket cannot be deleted by the deployment role. ACL metadata reads cover
+the shared bucket, but object-body reads/writes/deletes on CougarCalc paths are not
+granted. Internal stack diagnostics and updates require the exact environment ID
+plus both `Project=intex` and `elasticbeanstalk:environment-name=intex-dev`.
+Regional EC2/Auto Scaling discovery APIs require wildcard resources; their actions
+are enumerated and region restricted.
+Some Beanstalk describe
 APIs require read-only wildcard resources; these are region-restricted.
 Beanstalk runtime roles use AWS's standard WebTier and EnhancedHealth managed
 policies; those are broader than the application deployment role and do not belong
