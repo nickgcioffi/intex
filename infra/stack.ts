@@ -117,6 +117,16 @@ export class IntexStack extends Stack {
         `arn:${this.partition}:s3:::elasticbeanstalk-${this.region}-${this.account}/resources/_runtime/*/intex/*`,
       ],
     }));
+    // EB's allocated stack ID changes on rebuild; require both project and env tags.
+    deployRole.addToPolicy(new iam.PolicyStatement({
+      actions: ['cloudformation:GetTemplate', 'cloudformation:DescribeStacks', 'cloudformation:DescribeStackResources'],
+      resources: [`arn:${this.partition}:cloudformation:${this.region}:${this.account}:stack/awseb-e-*-stack/*`],
+      conditions: { StringEquals: {
+        'aws:RequestedRegion': 'us-east-2',
+        'aws:ResourceTag/Project': 'intex',
+        'aws:ResourceTag/elasticbeanstalk:environment-name': 'intex-dev',
+      } },
+    }));
     const topic = new sns.Topic(this, 'Alerts');
     topic.addSubscription(new subscriptions.EmailSubscription(email.valueAsString));
     const alarm = new cw.Alarm(this, 'HealthAlarm', {
