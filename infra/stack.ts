@@ -104,14 +104,14 @@ export class IntexStack extends Stack {
     deployRole.addToPolicy(new iam.PolicyStatement({ actions: ['s3:ListBucket', 's3:GetBucketLocation'], resources: [artifacts.bucketArn] }));
     // UpdateEnvironment checks/ensures its regional EB service bucket even when it exists.
     deployRole.addToPolicy(new iam.PolicyStatement({
-      actions: ['s3:CreateBucket', 's3:PutBucketOwnershipControls'],
+      actions: ['s3:CreateBucket', 's3:PutBucketOwnershipControls', 's3:ListBucket'],
       resources: [`arn:${this.partition}:s3:::elasticbeanstalk-${this.region}-${this.account}`],
       conditions: regionCondition,
     }));
     // Beanstalk copies application bundles/extensions into its regional runtime store.
     // The environment ID is allocated by EB; the application segment remains exact.
     deployRole.addToPolicy(new iam.PolicyStatement({
-      actions: ['s3:GetObject', 's3:PutObject'],
+      actions: ['s3:GetObject', 's3:PutObject', 's3:PutObjectAcl'],
       resources: [
         `arn:${this.partition}:s3:::elasticbeanstalk-${this.region}-${this.account}/resources/environments/*/_runtime/*/intex/*`,
         `arn:${this.partition}:s3:::elasticbeanstalk-${this.region}-${this.account}/resources/_runtime/*/intex/*`,
