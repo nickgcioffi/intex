@@ -24,7 +24,9 @@ fs.appendFileSync('calls.log', args.join(' ') + '\\n');
 if (args[1] === 'describe-environments') {
   if (args.includes('Environments[0].Status')) console.log(process.env.MODE === 'busy' ? 'Updating' : 'Ready');
   else if (args.includes('Environments[0].VersionLabel')) console.log('prior');
-  else console.log(JSON.stringify({Environments:[{Status:'Ready',Health:'Green',VersionLabel:process.env.VERSION,CNAME:process.env.TEST_HOST}]}));
+  else console.log(JSON.stringify({Environments:[{Status:'Ready',Health:process.env.MODE === 'asyncfailed' ? 'Red' : 'Green',VersionLabel:process.env.MODE === 'asyncfailed' ? 'prior' : process.env.VERSION,CNAME:process.env.TEST_HOST}]}));
+} else if (args[1] === 'describe-events') {
+  console.log(JSON.stringify({Events:process.env.MODE === 'asyncfailed' ? [{Message:'Downstream deployment denied'}] : []}));
 } else if (args[1] === 'update-environment' && process.env.MODE === 'denied') {
   console.error('AccessDenied'); process.exit(1);
 } else console.log('{}');
@@ -59,4 +61,9 @@ test('deployment rejects missing CloudFormation output before any AWS call', asy
   const f = await fixture('ok', t);
   f.env.ARTIFACT_BUCKET = 'None';
   await assert.rejects(exec('bash', [deploy], f), /Invalid ARTIFACT_BUCKET/);
+});
+
+test('deployment fails promptly when an accepted update reports asynchronous AWS errors', async (t) => {
+  const f = await fixture('asyncfailed', t);
+  await assert.rejects(exec('bash', [deploy], f), /Downstream deployment denied/);
 });
