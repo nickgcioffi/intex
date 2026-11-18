@@ -155,3 +155,9 @@ vite.config.ts.timestamp-*
 .nx/cache
 .nx/workspace-data
 .nx/migrate-runs
+
+# INTEX application and infrastructure outputs
+infra/cdk.out/
+.env
+.env.*
+!.env.example
