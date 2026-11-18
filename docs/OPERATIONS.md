@@ -1,5 +1,8 @@
 # INTEX deployment operations
 
+For the period before the November 30 project start, use the [dormancy and activation
+runbook](DORMANCY.md). PR validation can run while the application environment is off.
+
 ## Ownership and approval boundaries
 
 Repository: `nickgcioffi/intex`. Region: `us-east-2`. Stack: `IntexPipeline`.
@@ -79,13 +82,13 @@ provider for `token.actions.githubusercontent.com`; creating it is an account-le
 change requiring approval. New providers are retained on teardown to avoid breaking
 future users of that account-wide identity provider.
 
-After owner approval, supply the alert recipient and execute:
+After owner approval for an active environment, supply the alert recipient and execute:
 
 ```bash
 aws cloudformation deploy --stack-name IntexPipeline \
   --template-file infra/cdk.out/IntexPipeline.template.json \
   --capabilities CAPABILITY_IAM --region us-east-2 \
-  --parameter-overrides AlertEmail=YOUR_TEAM_EMAIL CreateOidcProvider=true
+  --parameter-overrides AlertEmail=YOUR_TEAM_EMAIL CreateOidcProvider=true EnvironmentEnabled=true
 aws cloudformation describe-stacks --stack-name IntexPipeline \
   --region us-east-2 --query 'Stacks[0].Outputs'
 ```
