@@ -27,3 +27,9 @@ test('private versioned artifact bucket, isolated DB subnets, budget and health 
   t.resourceCountIs('AWS::Budgets::Budget', 1);
   t.resourceCountIs('AWS::CloudWatch::Alarm', 1);
 });
+
+test('enhanced health service policy uses the AWS service-role path', () => {
+  template().hasResourceProperties('AWS::IAM::Role', { ManagedPolicyArns: Match.arrayWith([Match.objectLike({
+    'Fn::Join': Match.arrayWith([Match.arrayWith([Match.stringLikeRegexp('.*policy/service-role/AWSElasticBeanstalkEnhancedHealth')])]),
+  })]) });
+});

@@ -50,7 +50,7 @@ export class IntexStack extends Stack {
     const profile = new iam.CfnInstanceProfile(this, 'InstanceProfile', { roles: [instanceRole.roleName] });
     const serviceRole = new iam.Role(this, 'ServiceRole', {
       assumedBy: new iam.ServicePrincipal('elasticbeanstalk.amazonaws.com', { conditions: { StringEquals: { 'sts:ExternalId': 'elasticbeanstalk' } } }),
-      managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('AWSElasticBeanstalkEnhancedHealth')],
+      managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSElasticBeanstalkEnhancedHealth')],
     });
     const application = new eb.CfnApplication(this, 'Application', { applicationName: 'intex', description: 'BYU IS INTEX placeholder and future application' });
     const option = (namespace: string, optionName: string, value: string) => ({ namespace, optionName, value });
