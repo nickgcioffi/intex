@@ -37,7 +37,7 @@ test('enhanced health service policy uses the AWS service-role path', () => {
 test('internal stack diagnostics require both project and exact environment tags', () => {
   template().hasResourceProperties('AWS::IAM::Policy', {
     PolicyDocument: { Statement: Match.arrayWith([Match.objectLike({
-      Action: ['cloudformation:GetTemplate', 'cloudformation:DescribeStacks', 'cloudformation:DescribeStackResource', 'cloudformation:DescribeStackResources'],
+      Action: ['cloudformation:GetTemplate', 'cloudformation:DescribeStacks', 'cloudformation:DescribeStackResource', 'cloudformation:DescribeStackResources', 'cloudformation:DescribeStackEvents'],
       Condition: { StringEquals: {
         'aws:RequestedRegion': 'us-east-2',
         'aws:ResourceTag/Project': 'intex',
